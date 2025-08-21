@@ -5,11 +5,15 @@ from pynput import keyboard
 from enum import Enum
 import argparse as ap
 
+# pyright: reportArgumentType=false
+# pyright: reportAttributeAccessIssue=false
+
 # Command enums
 Lon = Enum('Lon', [('still', 0), ('forward', 1), ('back', 2)])
 Lat = Enum('Lat', [('center', 0), ('left', 1), ('right', 2)])
 
 wasd = {'w': False, 'a': False, 's': False, 'd': False} # keep track of wasd keys
+arrows = {'u': False, 'd': False} # state of up/down arrow keys
 
 def send_cmd(): # get the current state of wasd keys and sends a command
     # w/s for pure forward backward
@@ -38,34 +42,46 @@ def send_cmd(): # get the current state of wasd keys and sends a command
 
     if lon == Lon.forward and lat == Lat.center:
         return socket.send_string('cmd:forward')
-    
+
     if lon == Lon.forward and lat == Lat.left:
         return socket.send_string('cmd:forwardleft')
-    
+
     if lon == Lon.forward and lat == Lat.right:
         return socket.send_string('cmd:forwardright')
-    
+
     if lon == Lon.back and lat == Lat.center:
         return socket.send_string('cmd:backward')
-    
+
     if lon == Lon.back and lat == Lat.left:
         return socket.send_string('cmd:backwardleft')
-    
+
     if lon == Lon.back and lat == Lat.right:
         return socket.send_string('cmd:backwardright')
-    
+
     if lon == Lon.still and lat == Lat.left:
         return socket.send_string('cmd:pivotleft')
-    
+
     if lon == Lon.still and lat == Lat.right:
         return socket.send_string('cmd:pivotright')
 
     if lon == Lon.still and lat == Lat.center:
         return socket.send_string('cmd:still')
 
+def send_tilt():
+    if arrows['u'] and not arrows['d']:
+        return socket.send_string('tilt:up')
+
+    if arrows['d'] and not arrows['u']:
+        return socket.send_string('tilt:down')
+
+    return socket.send_string('tilt:stop')
 
 def on_press(key, injected): # executes whenever a key is pressed
     try:
+        if key == keyboard.Key.up or key == keyboard.Key.down:
+            arrows['u' if key == keyboard.Key.up else 'd'] = True
+            send_tilt()
+
         if key.char in 'wasd':
             wasd[key.char] = True
             send_cmd()
@@ -74,6 +90,10 @@ def on_press(key, injected): # executes whenever a key is pressed
 
 def on_release(key, injected): # executes whenever a key is released
     try:
+        if key == keyboard.Key.up or key == keyboard.Key.down:
+            arrows['u' if key == keyboard.Key.up else 'd'] = False
+            send_tilt()
+
         if key.char in 'wasd':
             wasd[key.char] = False
             send_cmd()
@@ -82,13 +102,13 @@ def on_release(key, injected): # executes whenever a key is released
 
 if __name__=="__main__":
     parser = ap.ArgumentParser(description='Listens to WASD key commands and publishes corresponding control actions.')
-    parser.add_argument('-i', '--interface', 
+    parser.add_argument('-i', '--interface',
                         type=str,
                         help='Start the publisher on a specific interface. Default is all (*)')
-    parser.add_argument('-p', '--port', 
+    parser.add_argument('-p', '--port',
                         type=int,
                         help='Start the publisher on a specific port. Default is 5555')
-    
+
     args = parser.parse_args()
     context = zmq.Context()
 
@@ -107,5 +127,3 @@ if __name__=="__main__":
                 on_press=on_press,
                 on_release=on_release) as listener:
             listener.join()
-
-
