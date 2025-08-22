@@ -85,7 +85,7 @@ def on_press(key, injected): # executes whenever a key is pressed
         if key.char in 'wasd':
             wasd[key.char] = True
             send_cmd()
-    except AttributeError:
+    except (AttributeError, TypeError):
         pass
 
 def on_release(key, injected): # executes whenever a key is released
@@ -97,7 +97,7 @@ def on_release(key, injected): # executes whenever a key is released
         if key.char in 'wasd':
             wasd[key.char] = False
             send_cmd()
-    except AttributeError:
+    except (AttributeError, TypeError):
         pass
 
 if __name__=="__main__":
